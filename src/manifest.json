@@ -1,11 +1,12 @@
 {
+    "version": 1,
     "requires": {
         "cockpit": "137"
     },
-
     "tools": {
-        "index": {
-            "label": "OpenShift"
+        "openshift": {
+            "label": "OpenShift Management",
+            "path": "index.html"
         }
     }
 }

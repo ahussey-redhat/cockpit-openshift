@@ -22,6 +22,7 @@ import React from 'react';
 import { Alert } from "@patternfly/react-core/dist/esm/components/Alert/index.js";
 import { Button } from "@patternfly/react-core/dist/esm/components/Button/index.js";
 import { Card, CardBody, CardTitle } from "@patternfly/react-core/dist/esm/components/Card/index.js";
+import { Flex, FlexItem } from "@patternfly/react-core/dist/esm/layouts/Flex/index.js";
 import { Stack, StackItem } from "@patternfly/react-core/dist/esm/layouts/Stack/index.js";
 import { LogView } from "./components/log-view";
 
@@ -57,7 +58,41 @@ export const Application = () => {
             }
 
             setDeployState(DEPLOY_STATES.DEPLOYING);
-            cockpit.spawn(["ping", "-c", "4", "8.8.8.8"])
+            cockpit.spawn(["deploy-openshift-all-nodes"], { err: "message" })
+                    .stream((data) => setOutput((output) => output + data))
+                    .then(() => setDeployState(DEPLOY_STATES.DEPLOYED))
+                    .catch(() => setDeployState(DEPLOY_STATES.FAILED));
+        },
+        [deployState]
+    );
+
+    const deployOpenShiftSNOA = React.useCallback(
+        () => {
+            if (deployState === DEPLOY_STATES.DEPLOYING) {
+                return;
+            }
+
+            setDeployState(DEPLOY_STATES.DEPLOYING);
+            cockpit.spawn(["deploy-sno-a"], { err: "message" })
+                    .stream((data) => setOutput((output) => output + data))
+                    .then(() => setDeployState(DEPLOY_STATES.DEPLOYED))
+                    .catch(({ message }, maybeStdErr) => {
+                        console.log(`message: ${message}`);
+                        console.log(`maybeStdErr: ${maybeStdErr}`);
+                        setDeployState(DEPLOY_STATES.FAILED);
+                    });
+        },
+        [deployState]
+    );
+
+    const deployOpenShiftSNOB = React.useCallback(
+        () => {
+            if (deployState === DEPLOY_STATES.DEPLOYING) {
+                return;
+            }
+
+            setDeployState(DEPLOY_STATES.DEPLOYING);
+            cockpit.spawn(["deploy-sno-b"], { err: "out" })
                     .stream((data) => setOutput((output) => output + data))
                     .then(() => setDeployState(DEPLOY_STATES.DEPLOYED))
                     .catch(() => setDeployState(DEPLOY_STATES.FAILED));
@@ -67,22 +102,54 @@ export const Application = () => {
 
     return (
         <Card>
-            <CardTitle>OpenShift</CardTitle>
+            <CardTitle>OpenShift Provisioning</CardTitle>
             <CardBody>
                 <Stack hasGutter>
                     <StackItem>
-                        <Button
-                            isDisabled={deployState === DEPLOY_STATES.DEPLOYING}
-                            onClick={deployOpenShift}
-                        >
-                            {
-                                _(
-                                    deployState === DEPLOY_STATES.DEPLOYING
-                                        ? "Deploying..."
-                                        : "Deploy OpenShift"
-                                )
-                            }
-                        </Button>
+                        <Flex>
+                            <FlexItem>
+                                <Button
+                                    isDisabled={deployState === DEPLOY_STATES.DEPLOYING}
+                                    onClick={deployOpenShift}
+                                >
+                                    {
+                                        _(
+                                            deployState === DEPLOY_STATES.DEPLOYING
+                                                ? "Deploying to both Sleds"
+                                                : "Deploy OpenShift on both Sleds"
+                                        )
+                                    }
+                                </Button>
+                            </FlexItem>
+                            <FlexItem>
+                                <Button
+                                    isDisabled={deployState === DEPLOY_STATES.DEPLOYING}
+                                    onClick={deployOpenShiftSNOA}
+                                >
+                                    {
+                                        _(
+                                            deployState === DEPLOY_STATES.DEPLOYING
+                                                ? "Deploying to Sled 1"
+                                                : "Deploy OpenShift on Sled 1"
+                                        )
+                                    }
+                                </Button>
+                            </FlexItem>
+                            <FlexItem>
+                                <Button
+                                    isDisabled={deployState === DEPLOY_STATES.DEPLOYING}
+                                    onClick={deployOpenShiftSNOB}
+                                >
+                                    {
+                                        _(
+                                            deployState === DEPLOY_STATES.DEPLOYING
+                                                ? "Deploying to Sled 2"
+                                                : "Deploy OpenShift on Sled 2"
+                                        )
+                                    }
+                                </Button>
+                            </FlexItem>
+                        </Flex>
                     </StackItem>
                     {
                         deployState === DEPLOY_STATES.UNKNOWN
