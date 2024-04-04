@@ -44,6 +44,8 @@ export const Application = () => {
     const [hostname, setHostname] = React.useState(_("Unknown"));
     const [deployState, setDeployState] = React.useState(DEPLOY_STATES.UNKNOWN);
     const [output, setOutput] = React.useState("");
+    const [deploySNOAState, setSNOADeployState] = React.useState(DEPLOY_STATES.UNKNOWN);
+    const [deploySNOBState, setSNOBDeployState] = React.useState(DEPLOY_STATES.UNKNOWN);
 
     React.useEffect(() => {
         cockpit.file('/etc/hostname').watch(content => {
@@ -68,36 +70,36 @@ export const Application = () => {
 
     const deployOpenShiftSNOA = React.useCallback(
         () => {
-            if (deployState === DEPLOY_STATES.DEPLOYING) {
+            if (deploySNOAState === DEPLOY_STATES.DEPLOYING) {
                 return;
             }
 
-            setDeployState(DEPLOY_STATES.DEPLOYING);
+            setSNOADeployState(DEPLOY_STATES.DEPLOYING);
             cockpit.spawn(["deploy-sno-a"], { err: "message" })
                     .stream((data) => setOutput((output) => output + data))
-                    .then(() => setDeployState(DEPLOY_STATES.DEPLOYED))
+                    .then(() => setSNOADeployState(DEPLOY_STATES.DEPLOYED))
                     .catch(({ message }, maybeStdErr) => {
                         console.log(`message: ${message}`);
                         console.log(`maybeStdErr: ${maybeStdErr}`);
-                        setDeployState(DEPLOY_STATES.FAILED);
+                        setSNOADeployState(DEPLOY_STATES.FAILED);
                     });
         },
-        [deployState]
+        [deploySNOAState]
     );
 
     const deployOpenShiftSNOB = React.useCallback(
         () => {
-            if (deployState === DEPLOY_STATES.DEPLOYING) {
+            if (deploySNOBState === DEPLOY_STATES.DEPLOYING) {
                 return;
             }
 
-            setDeployState(DEPLOY_STATES.DEPLOYING);
+            setSNOBDeployState(DEPLOY_STATES.DEPLOYING);
             cockpit.spawn(["deploy-sno-b"], { err: "out" })
                     .stream((data) => setOutput((output) => output + data))
-                    .then(() => setDeployState(DEPLOY_STATES.DEPLOYED))
-                    .catch(() => setDeployState(DEPLOY_STATES.FAILED));
+                    .then(() => setSNOBDeployState(DEPLOY_STATES.DEPLOYED))
+                    .catch(() => setSNOBDeployState(DEPLOY_STATES.FAILED));
         },
-        [deployState]
+        [deploySNOBState]
     );
 
     return (
@@ -109,7 +111,7 @@ export const Application = () => {
                         <Flex>
                             <FlexItem>
                                 <Button
-                                    isDisabled={deployState === DEPLOY_STATES.DEPLOYING}
+                                    isDisabled={deployState === DEPLOY_STATES.DEPLOYING || deploySNOAState === DEPLOY_STATES.DEPLOYING || deploySNOBState === DEPLOY_STATES.DEPLOYING}
                                     onClick={deployOpenShift}
                                 >
                                     {
@@ -123,12 +125,12 @@ export const Application = () => {
                             </FlexItem>
                             <FlexItem>
                                 <Button
-                                    isDisabled={deployState === DEPLOY_STATES.DEPLOYING}
+                                    isDisabled={deploySNOAState === DEPLOY_STATES.DEPLOYING}
                                     onClick={deployOpenShiftSNOA}
                                 >
                                     {
                                         _(
-                                            deployState === DEPLOY_STATES.DEPLOYING
+                                            deploySNOAState === DEPLOY_STATES.DEPLOYING
                                                 ? "Deploying to Sled 1"
                                                 : "Deploy OpenShift on Sled 1"
                                         )
@@ -137,12 +139,12 @@ export const Application = () => {
                             </FlexItem>
                             <FlexItem>
                                 <Button
-                                    isDisabled={deployState === DEPLOY_STATES.DEPLOYING}
+                                    isDisabled={deploySNOBState === DEPLOY_STATES.DEPLOYING}
                                     onClick={deployOpenShiftSNOB}
                                 >
                                     {
                                         _(
-                                            deployState === DEPLOY_STATES.DEPLOYING
+                                            deploySNOBState === DEPLOY_STATES.DEPLOYING
                                                 ? "Deploying to Sled 2"
                                                 : "Deploy OpenShift on Sled 2"
                                         )
@@ -158,7 +160,31 @@ export const Application = () => {
                                 <StackItem>
                                     <Alert
                                         variant={ALERT_DEPLOY_STATE_MAP[deployState] ?? "info"}
-                                        title={ cockpit.format(_("Running on $0"), hostname) }
+                                        title={ cockpit.format(_("Deploying to both sleds")) }
+                                    />
+                                </StackItem>
+                            )
+                    }
+                    {
+                        deploySNOAState === DEPLOY_STATES.UNKNOWN
+                            ? null
+                            : (
+                                <StackItem>
+                                    <Alert
+                                        variant={ALERT_DEPLOY_STATE_MAP[deploySNOAState] ?? "info"}
+                                        title={ cockpit.format(_("Deploying to sled 1")) }
+                                    />
+                                </StackItem>
+                            )
+                    }
+                    {
+                        deploySNOBState === DEPLOY_STATES.UNKNOWN
+                            ? null
+                            : (
+                                <StackItem>
+                                    <Alert
+                                        variant={ALERT_DEPLOY_STATE_MAP[deploySNOBState] ?? "info"}
+                                        title={ cockpit.format(_("Deploying to sled 2")) }
                                     />
                                 </StackItem>
                             )
