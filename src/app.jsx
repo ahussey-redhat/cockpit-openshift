@@ -1,22 +1,3 @@
-/*
- * This file is part of Cockpit.
- *
- * Copyright (C) 2017 Red Hat, Inc.
- *
- * Cockpit is free software; you can redistribute it and/or modify it
- * under the terms of the GNU Lesser General Public License as published by
- * the Free Software Foundation; either version 2.1 of the License, or
- * (at your option) any later version.
- *
- * Cockpit is distributed in the hope that it will be useful, but
- * WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the GNU
- * Lesser General Public License for more details.
- *
- * You should have received a copy of the GNU Lesser General Public License
- * along with Cockpit; If not, see <http://www.gnu.org/licenses/>.
- */
-
 import cockpit from 'cockpit';
 import React from 'react';
 import { Alert } from "@patternfly/react-core/dist/esm/components/Alert/index.js";
@@ -24,180 +5,195 @@ import { Button } from "@patternfly/react-core/dist/esm/components/Button/index.
 import { Card, CardBody, CardTitle } from "@patternfly/react-core/dist/esm/components/Card/index.js";
 import { Flex, FlexItem } from "@patternfly/react-core/dist/esm/layouts/Flex/index.js";
 import { Stack, StackItem } from "@patternfly/react-core/dist/esm/layouts/Stack/index.js";
+import { Tab, TabContent, TabContentBody, Tabs, TabTitleText } from "@patternfly/react-core/dist/esm/components/Tabs/index.js";
+import { DeploymentAlert } from "./components/deployment-alert";
+import { DeploymentTab, DEPLOY_STATES } from "./components/deployment-tab";
 import { LogView } from "./components/log-view";
+import { useDeployment } from "./hooks/use-deployment";
 
 const _ = cockpit.gettext;
 
-const DEPLOY_STATES = {
-    UNKNOWN: "unknown",
-    DEPLOYING: "deploying",
-    DEPLOYED: "deployed",
-    FAILED: "failed"
-};
-
-const ALERT_DEPLOY_STATE_MAP = {
-    [DEPLOY_STATES.DEPLOYED]: "success",
-    [DEPLOY_STATES.FAILED]: "danger",
-};
-
 export const Application = () => {
-    const [hostname, setHostname] = React.useState(_("Unknown"));
-    const [deployState, setDeployState] = React.useState(DEPLOY_STATES.UNKNOWN);
-    const [output, setOutput] = React.useState("");
-    const [deploySNOAState, setSNOADeployState] = React.useState(DEPLOY_STATES.UNKNOWN);
-    const [deploySNOBState, setSNOBDeployState] = React.useState(DEPLOY_STATES.UNKNOWN);
+    const [activeTabKey, setActiveTabKey] = React.useState(0);
+    const handleTabClick = React.useCallback((_event, tabIndex) => setActiveTabKey(tabIndex), []);
+    const [deployAdditionalServicesOutput, setDeployAdditionalServicesOutput] = React.useState("");
+    const [deployAdditionalServicesState, setAdditionalServicesState] = React.useState(DEPLOY_STATES.UNKNOWN);
 
-    React.useEffect(() => {
-        cockpit.file('/etc/hostname').watch(content => {
-            setHostname(content.trim());
-        });
-    }, []);
+    const [deployOpenShiftSNOA, deploySNOAState, deploySNOAOutput] = useDeployment("deploy-sno-a");
+    const [deployOpenShiftSNOB, deploySNOBState, deploySNOBOutput] = useDeployment("deploy-sno-b");
+    const [deployCoreServices, deployCoreServicesState, deployCoreServicesOutput] = useDeployment("deploy-core-services");
+    const [resetEnvironment, resetEnvironmentState, resetEnvironmentOutput] = useDeployment("reset-environment");
+
+    // const [newAlertKey, setNewAlertKey] = React.useState(0);
 
     const deployOpenShift = React.useCallback(
         () => {
-            if (deployState === DEPLOY_STATES.DEPLOYING) {
-                return;
-            }
-
-            setDeployState(DEPLOY_STATES.DEPLOYING);
-            cockpit.spawn(["deploy-openshift-all-nodes"], { err: "message" })
-                    .stream((data) => setOutput((output) => output + data))
-                    .then(() => setDeployState(DEPLOY_STATES.DEPLOYED))
-                    .catch(() => setDeployState(DEPLOY_STATES.FAILED));
+            deployOpenShiftSNOA();
+            deployOpenShiftSNOB();
         },
-        [deployState]
+        [deployOpenShiftSNOA, deployOpenShiftSNOB]
     );
 
-    const deployOpenShiftSNOA = React.useCallback(
-        () => {
-            if (deploySNOAState === DEPLOY_STATES.DEPLOYING) {
+    const deployAdditionalServices = React.useCallback(
+        (service) => {
+            if (deployAdditionalServicesState === DEPLOY_STATES.DEPLOYING) {
                 return;
             }
-
-            setSNOADeployState(DEPLOY_STATES.DEPLOYING);
-            cockpit.spawn(["deploy-sno-a"], { err: "message" })
-                    .stream((data) => setOutput((output) => output + data))
-                    .then(() => setSNOADeployState(DEPLOY_STATES.DEPLOYED))
-                    .catch(({ message }, maybeStdErr) => {
-                        console.log(`message: ${message}`);
-                        console.log(`maybeStdErr: ${maybeStdErr}`);
-                        setSNOADeployState(DEPLOY_STATES.FAILED);
-                    });
-        },
-        [deploySNOAState]
-    );
-
-    const deployOpenShiftSNOB = React.useCallback(
-        () => {
-            if (deploySNOBState === DEPLOY_STATES.DEPLOYING) {
+            if (service === "medical") {
+                setAdditionalServicesState(DEPLOY_STATES.DEPLOYING);
+                cockpit.spawn(["echo", "deploying medical services"], { err: "out" })
+                .stream((data) => setDeployAdditionalServicesOutput((output) => output + data))
+                .then(() => setAdditionalServicesState(DEPLOY_STATES.DEPLOYED))
+                .catch(() => setAdditionalServicesState(DEPLOY_STATES.FAILED));
                 return;
             }
-
-            setSNOBDeployState(DEPLOY_STATES.DEPLOYING);
-            cockpit.spawn(["deploy-sno-b"], { err: "out" })
-                    .stream((data) => setOutput((output) => output + data))
-                    .then(() => setSNOBDeployState(DEPLOY_STATES.DEPLOYED))
-                    .catch(() => setSNOBDeployState(DEPLOY_STATES.FAILED));
+            if (service === "logistics") {
+                setAdditionalServicesState(DEPLOY_STATES.DEPLOYING);
+                cockpit.spawn(["echo", "deploying logistics services"], { err: "out" })
+                .stream((data) => setDeployAdditionalServicesOutput((output) => output + data))
+                .then(() => setAdditionalServicesState(DEPLOY_STATES.DEPLOYED))
+                .catch(() => setAdditionalServicesState(DEPLOY_STATES.FAILED));
+                return;
+            }
+            if (service === "mission") {
+                setAdditionalServicesState(DEPLOY_STATES.DEPLOYING);
+                cockpit.spawn(["echo", "deploying mission services"], { err: "out" })
+                .stream((data) => setDeployAdditionalServicesOutput((output) => output + data))
+                .then(() => setAdditionalServicesState(DEPLOY_STATES.DEPLOYED))
+                .catch(() => setAdditionalServicesState(DEPLOY_STATES.FAILED));
+                return;
+            }
         },
-        [deploySNOBState]
+        [deployAdditionalServicesState]
     );
 
     return (
         <Card>
-            <CardTitle>OpenShift Provisioning</CardTitle>
+            <CardTitle>OpenShift</CardTitle>
             <CardBody>
                 <Stack hasGutter>
                     <StackItem>
-                        <Flex>
-                            <FlexItem>
-                                <Button
-                                    isDisabled={deployState === DEPLOY_STATES.DEPLOYING || deploySNOAState === DEPLOY_STATES.DEPLOYING || deploySNOBState === DEPLOY_STATES.DEPLOYING}
-                                    onClick={deployOpenShift}
-                                >
-                                    {
-                                        _(
-                                            deployState === DEPLOY_STATES.DEPLOYING
-                                                ? "Deploying to both Sleds"
-                                                : "Deploy OpenShift on both Sleds"
-                                        )
-                                    }
-                                </Button>
-                            </FlexItem>
-                            <FlexItem>
-                                <Button
-                                    isDisabled={deploySNOAState === DEPLOY_STATES.DEPLOYING}
-                                    onClick={deployOpenShiftSNOA}
-                                >
-                                    {
-                                        _(
-                                            deploySNOAState === DEPLOY_STATES.DEPLOYING
-                                                ? "Deploying to Sled 1"
-                                                : "Deploy OpenShift on Sled 1"
-                                        )
-                                    }
-                                </Button>
-                            </FlexItem>
-                            <FlexItem>
-                                <Button
-                                    isDisabled={deploySNOBState === DEPLOY_STATES.DEPLOYING}
-                                    onClick={deployOpenShiftSNOB}
-                                >
-                                    {
-                                        _(
-                                            deploySNOBState === DEPLOY_STATES.DEPLOYING
-                                                ? "Deploying to Sled 2"
-                                                : "Deploy OpenShift on Sled 2"
-                                        )
-                                    }
-                                </Button>
-                            </FlexItem>
-                        </Flex>
+                        <Button
+                            isDisabled={deploySNOAState === DEPLOY_STATES.DEPLOYING || deploySNOBState === DEPLOY_STATES.DEPLOYING}
+                            onClick={deployOpenShift}
+                        >
+                            {
+                                _(
+                                    deploySNOAState === DEPLOY_STATES.DEPLOYING && deploySNOBState === DEPLOY_STATES.DEPLOYING
+                                        ? "Deploying to both sleds"
+                                        : "Deploy OpenShift to both sleds"
+                                )
+                            }
+                        </Button>
                     </StackItem>
-                    {
-                        deployState === DEPLOY_STATES.UNKNOWN
-                            ? null
-                            : (
-                                <StackItem>
-                                    <Alert
-                                        variant={ALERT_DEPLOY_STATE_MAP[deployState] ?? "info"}
-                                        title={ cockpit.format(_("Deploying to both sleds")) }
+                    <DeploymentAlert deploymentState={deploySNOAState} title="Deploying to sled 1" timeout={30000} />
+                    <DeploymentAlert deploymentState={deploySNOBState} title="Deploying to sled 2" timeout={30000} />
+                    <DeploymentAlert deploymentState={deployCoreServicesState} title="Deploying core services" timeout={30000} />
+                    <DeploymentAlert deploymentState={deployAdditionalServicesState} title="Deploying additional services" timeout={30000} />
+                    <DeploymentAlert deploymentState={resetEnvironmentState} title="Resetting Environment" timeout={10000} />
+                    <StackItem>
+                        <Tabs activeKey={activeTabKey} isBox onSelect={handleTabClick} unmountOnExit>
+                            <Tab eventKey={0} title={<TabTitleText>{_("Sled 1")}</TabTitleText>}>
+                                <TabContentBody hasPadding>
+                                    <DeploymentTab
+                                        deploymentState={deploySNOAState}
+                                        deployingButtonText="Deploying to Sled 1"
+                                        buttonText="Deploy OpenShift on Sled 1"
+                                        onButtonClick={deployOpenShiftSNOA}
+                                        logOutput={deploySNOAOutput}
                                     />
-                                </StackItem>
-                            )
-                    }
-                    {
-                        deploySNOAState === DEPLOY_STATES.UNKNOWN
-                            ? null
-                            : (
-                                <StackItem>
-                                    <Alert
-                                        variant={ALERT_DEPLOY_STATE_MAP[deploySNOAState] ?? "info"}
-                                        title={ cockpit.format(_("Deploying to sled 1")) }
+                                </TabContentBody>
+                            </Tab>
+                            <Tab eventKey={1} title={<TabTitleText>{_("Sled 2")}</TabTitleText>}>
+                                <TabContentBody hasPadding>
+                                    <DeploymentTab
+                                        deploymentState={deploySNOBState}
+                                        deployingButtonText="Deploying to Sled 2"
+                                        buttonText="Deploy OpenShift on Sled 2"
+                                        onButtonClick={deployOpenShiftSNOB}
+                                        logOutput={deploySNOBOutput}
                                     />
-                                </StackItem>
-                            )
-                    }
-                    {
-                        deploySNOBState === DEPLOY_STATES.UNKNOWN
-                            ? null
-                            : (
-                                <StackItem>
-                                    <Alert
-                                        variant={ALERT_DEPLOY_STATE_MAP[deploySNOBState] ?? "info"}
-                                        title={ cockpit.format(_("Deploying to sled 2")) }
+                                </TabContentBody>
+                            </Tab>
+                            <Tab eventKey={2} title={<TabTitleText>{_("Core Services")}</TabTitleText>}>
+                                <TabContentBody hasPadding>
+                                    <DeploymentTab
+                                        deploymentState={deployCoreServicesState}
+                                        deployingButtonText="Deploying core services"
+                                        buttonText="Deploy core services"
+                                        onButtonClick={deployCoreServices}
+                                        logOutput={deployCoreServicesOutput}
                                     />
-                                </StackItem>
-                            )
-                    }
-                    {
-                        output.length > 0
-                            ? (
-                                <StackItem>
-                                    <LogView data={output} />
-                                </StackItem>
-                            )
-                            : null
-                    }
+                                </TabContentBody>
+                            </Tab>
+                            <Tab eventKey={3} title={<TabTitleText>{_("Additional Services")}</TabTitleText>}>
+                                <TabContentBody hasPadding>
+                                    <Stack hasGutter>
+                                        <StackItem>
+                                            <Flex>
+                                                <FlexItem>
+                                                    <Button
+                                                        isDisabled={deployAdditionalServicesState === DEPLOY_STATES.DEPLOYING}
+                                                        onClick={() => deployAdditionalServices("medical")}
+                                                    >
+                                                        {
+                                                            _(
+                                                                deployAdditionalServicesState === DEPLOY_STATES.DEPLOYING
+                                                                    ? "Deploying medical services"
+                                                                    : "Deploy medical services"
+                                                            )
+                                                        }
+                                                    </Button>
+                                                </FlexItem>
+                                                <FlexItem>
+                                                    <Button
+                                                        isDisabled={deployAdditionalServicesState === DEPLOY_STATES.DEPLOYING}
+                                                        onClick={() => deployAdditionalServices("logistics")}
+                                                    >
+                                                        {
+                                                            _(
+                                                                deployAdditionalServicesState === DEPLOY_STATES.DEPLOYING
+                                                                    ? "Deploying logistics services"
+                                                                    : "Deploy logistics services"
+                                                            )
+                                                        }
+                                                    </Button>
+                                                </FlexItem>
+                                                <FlexItem>
+                                                    <Button
+                                                        isDisabled={deployAdditionalServicesState === DEPLOY_STATES.DEPLOYING}
+                                                        onClick={() => deployAdditionalServices("mission")}
+                                                    >
+                                                        {
+                                                            _(
+                                                                deployAdditionalServicesState === DEPLOY_STATES.DEPLOYING
+                                                                    ? "Deploying mission services"
+                                                                    : "Deploy mission services"
+                                                            )
+                                                        }
+                                                    </Button>
+                                                </FlexItem>
+                                            </Flex>
+                                        </StackItem>
+                                        <StackItem>
+                                            <LogView data={deployAdditionalServicesOutput} />
+                                        </StackItem>
+                                    </Stack>
+                                </TabContentBody>
+                            </Tab>
+                            <Tab eventKey={4} title={<TabTitleText>{_("Reset Environment")}</TabTitleText>}>
+                                <TabContentBody hasPadding>
+                                    <DeploymentTab
+                                        deploymentState={resetEnvironmentState}
+                                        deployingButtonText="Resetting environment"
+                                        buttonText="Reset environment"
+                                        onButtonClick={resetEnvironment}
+                                        logOutput={resetEnvironmentOutput}
+                                    />
+                                </TabContentBody>
+                            </Tab>
+                        </Tabs>
+                    </StackItem>
                 </Stack>
             </CardBody>
         </Card>
