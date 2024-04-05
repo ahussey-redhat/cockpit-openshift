@@ -41,7 +41,7 @@ export const Application = () => {
             }
             if (service === "medical") {
                 setAdditionalServicesState(DEPLOY_STATES.DEPLOYING);
-                cockpit.spawn(["echo", "deploying medical services"], { err: "out" })
+                cockpit.spawn(["deploy-medical-services"], { err: "out" })
                 .stream((data) => setDeployAdditionalServicesOutput((output) => output + data))
                 .then(() => setAdditionalServicesState(DEPLOY_STATES.DEPLOYED))
                 .catch(() => setAdditionalServicesState(DEPLOY_STATES.FAILED));
@@ -49,7 +49,7 @@ export const Application = () => {
             }
             if (service === "logistics") {
                 setAdditionalServicesState(DEPLOY_STATES.DEPLOYING);
-                cockpit.spawn(["echo", "deploying logistics services"], { err: "out" })
+                cockpit.spawn(["deploy-logistics-services"], { err: "out" })
                 .stream((data) => setDeployAdditionalServicesOutput((output) => output + data))
                 .then(() => setAdditionalServicesState(DEPLOY_STATES.DEPLOYED))
                 .catch(() => setAdditionalServicesState(DEPLOY_STATES.FAILED));
@@ -57,7 +57,7 @@ export const Application = () => {
             }
             if (service === "mission") {
                 setAdditionalServicesState(DEPLOY_STATES.DEPLOYING);
-                cockpit.spawn(["echo", "deploying mission services"], { err: "out" })
+                cockpit.spawn(["deploy-mission-services"], { err: "out" })
                 .stream((data) => setDeployAdditionalServicesOutput((output) => output + data))
                 .then(() => setAdditionalServicesState(DEPLOY_STATES.DEPLOYED))
                 .catch(() => setAdditionalServicesState(DEPLOY_STATES.FAILED));
